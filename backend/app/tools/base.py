@@ -3,9 +3,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel
 
-
-class ToolExecutionError(Exception):
-    """Raised when a validated tool request cannot be completed."""
+from app.core.errors import ToolExecutionError
 
 
 class BaseTool(ABC):
@@ -18,3 +16,5 @@ class BaseTool(ABC):
     async def execute(self, arguments: BaseModel) -> BaseModel:
         """Execute a validated tool request and return a validated result."""
         raise NotImplementedError
+
+__all__ = ["BaseTool", "ToolExecutionError"]

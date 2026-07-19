@@ -5,27 +5,41 @@ from sqlalchemy.orm import Session
 from app.agent.schemas import WorkflowState
 from app.models.task import Task, TaskStep
 from app.models.tool_call import ToolCall
+from app.models.workflow_checkpoint import WorkflowCheckpoint
 from app.models.workflow_run import WorkflowRun
 from app.workflow.graph import build_workflow
 
 
-def run_task_workflow(task: Task, db: Session) -> WorkflowRun:
+def run_task_workflow(
+    task: Task,
+    db: Session,
+    state_snapshot: dict[str, object] | None = None,
+    start_node: str = "planner",
+) -> WorkflowRun:
     workflow_run = WorkflowRun(task_id=task.id, status="running", current_node="planner")
     task.status = "running"
     db.add(workflow_run)
     db.commit()
     db.refresh(workflow_run)
 
-    state: dict[str, Any] = WorkflowState(task_id=task.id, goal=task.input_text).model_dump(
-        mode="json"
-    )
+    state: dict[str, Any] = state_snapshot or WorkflowState(
+        task_id=task.id, goal=task.input_text
+    ).model_dump(mode="json")
     try:
-        for update in build_workflow().stream(state, stream_mode="updates"):
+        for update in build_workflow(start_node).stream(state, stream_mode="updates"):
             node_name, node_update = next(iter(update.items()))
             state.update(node_update)
             workflow_run.current_node = node_name
             workflow_run.node_history = [*workflow_run.node_history, node_name]
             db.commit()
+            db.add(
+                WorkflowCheckpoint(
+                    task_id=task.id,
+                    workflow_run_id=workflow_run.id,
+                    current_node=node_name,
+                    state_snapshot=WorkflowState.model_validate(state).model_dump(mode="json"),
+                )
+            )
 
         final_state = WorkflowState.model_validate(state)
         if final_state.plan is not None:

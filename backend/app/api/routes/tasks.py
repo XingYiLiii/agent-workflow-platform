@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models.task import Task
 from app.models.workflow_run import WorkflowRun
 from app.schemas.task import TaskCreate, TaskListRead, TaskRead
+from app.services.workflow_recovery_service import WorkflowRecoveryService
 from app.services.workflow_service import run_task_workflow
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -49,6 +50,26 @@ def run_task(task_id: uuid.UUID, db: Session = Depends(get_db)) -> dict[str, obj
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     return _workflow_run_response(run_task_workflow(task, db))
+
+
+@router.post("/{task_id}/retry")
+def retry_task(task_id: uuid.UUID, db: Session = Depends(get_db)) -> dict[str, object]:
+    task = db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    if task.status != "failed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Only failed tasks can be retried"
+        )
+    if task.retry_count >= task.max_retry:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task retry limit reached")
+    task.retry_count += 1
+    db.commit()
+    try:
+        workflow_run = WorkflowRecoveryService().recover(task, db)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    return _workflow_run_response(workflow_run)
 
 
 @router.get("/{task_id}/workflow")

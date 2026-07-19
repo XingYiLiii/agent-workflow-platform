@@ -14,6 +14,12 @@ class Task(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     input_text: Mapped[str] = mapped_column("input", Text, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    error_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    failed_node: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retry_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    max_retry: Mapped[int] = mapped_column(nullable=False, default=2)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
