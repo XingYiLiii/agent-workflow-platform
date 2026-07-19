@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.schemas import WorkflowState
 from app.models.task import Task, TaskStep
+from app.models.tool_call import ToolCall
 from app.models.workflow_run import WorkflowRun
 from app.workflow.graph import build_workflow
 
@@ -40,6 +41,18 @@ def run_task_workflow(task: Task, db: Session) -> WorkflowRun:
                     )
                 )
 
+        for tool_result in final_state.tool_results:
+            db.add(
+                ToolCall(
+                    task_id=task.id,
+                    workflow_run_id=workflow_run.id,
+                    tool_name=tool_result.tool_name,
+                    input=tool_result.input,
+                    output=tool_result.output,
+                    status=tool_result.status,
+                    error_message=tool_result.error_message,
+                )
+            )
         workflow_run.result = {
             "final_output": final_state.final_output.model_dump(mode="json")
             if final_state.final_output
@@ -47,6 +60,7 @@ def run_task_workflow(task: Task, db: Session) -> WorkflowRun:
             "review_result": final_state.review_result.model_dump(mode="json")
             if final_state.review_result
             else None,
+            "tool_results": [result.model_dump(mode="json") for result in final_state.tool_results],
             "error": final_state.error,
         }
         succeeded = final_state.final_output is not None and final_state.error is None

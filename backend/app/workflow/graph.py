@@ -4,7 +4,8 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from app.agent.fake_provider import FakeLLMProvider
-from app.agent.schemas import FinalOutput, ReviewResult, StepResult, WorkflowState
+from app.agent.schemas import FinalOutput, ReviewResult, WorkflowState
+from app.workflow.tool_executor import execute_steps
 
 
 def _state(value: Mapping[str, Any] | WorkflowState) -> WorkflowState:
@@ -21,15 +22,7 @@ def executor_node(value: Mapping[str, Any] | WorkflowState) -> dict[str, object]
     state = _state(value)
     if state.plan is None:
         return {"error": "Execution plan is missing"}
-    results = [
-        StepResult(
-            step_id=step.id,
-            status="completed",
-            result=f"Completed simulated execution: {step.description}",
-        ).model_dump(mode="json")
-        for step in state.plan.steps
-    ]
-    return {"step_results": results, "current_step": len(results)}
+    return execute_steps(state)
 
 
 def reviewer_node(value: Mapping[str, Any] | WorkflowState) -> dict[str, object]:
