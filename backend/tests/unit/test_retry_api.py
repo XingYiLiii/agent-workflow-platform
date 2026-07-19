@@ -50,7 +50,6 @@ def test_non_failed_task_retry_is_rejected() -> None:
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as session:
-
         task = Task(title="Not failed", input_text="calculate: 1+1")
         session.add(task)
         session.commit()

@@ -17,4 +17,5 @@ class BaseTool(ABC):
         """Execute a validated tool request and return a validated result."""
         raise NotImplementedError
 
+
 __all__ = ["BaseTool", "ToolExecutionError"]
